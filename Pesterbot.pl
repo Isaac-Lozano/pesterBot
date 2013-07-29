@@ -26,7 +26,7 @@ my @alt_nicks = [];
 my $username = "pesterBot";
 my $name = "pesterBot";
 
-require "../MSPA.pl";
+require "MSPA.pl";
 
 my $bot = Bot::BasicBot->new( 
         server    => $server,
@@ -67,7 +67,8 @@ sub Bot::BasicBot::chanjoin{
 sub Bot::BasicBot::said{
     my ($botob, $args) = @_;
 
-    $$args{body} =~ s/<[Cc]=\d+,\d+,\d+>// =~ s_</c>__;
+    $$args{body} =~ s/<c=\d+,\d+,\d+>//ig;
+    $$args{body} =~ s/<\/c>//ig;
 
     if($$args{body} =~ /\w{2,5}: change colou?r (\d+,\d+,\d+)/i){
         Pcolor($botob, $args, $1);
@@ -127,7 +128,7 @@ sub randomPage{
     my $range = $Pester::rss{page} - $firstPage;
 
     my $page = int(rand($range)) + $firstPage;
-#    if(
+
     Psay($botob, (channel => $$args{channel}, body => "http://www.mspaintadventures.com/?s=6&p=00$page"));
 }
 
