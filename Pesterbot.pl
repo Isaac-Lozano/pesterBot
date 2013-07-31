@@ -4,6 +4,7 @@ use Data::Dumper;
 use Tie::File;
 use strict;
 use warnings;
+use diagnostics;
 package Pester;
 
 
@@ -11,13 +12,14 @@ package Pester;
 $Pester::currenttime = "i"; #Used for the Pesterchum "protocol"
 $Pester::color = "0,170,0"; #In decimal R,G,B format
 @Pester::Dave; #Holds the lines for Dave's Ebubble lines
+@Pester::Notes; #Holds the notes file
 $Pester::lastUpdate = "1"; #Just a random string so that the runtime doesn't complain (Holds the date string from the rss) 
 %Pester::rss = (
-    update => "1",
-    page => 1901,); #more random values (This holds data from the rss)
+        update => "1",
+        page => 1901,); #more random values (This holds data from the rss)
 $Pester::firstUpdate = 1;
 
-print("Enter bot password [Or ENTER]: "); #So that I don't have to put my bot's password on github >_>
+print("Enter bot password [or ENTER]: "); #So that I don't have to put my bot's password on github >_>
 
 #Server Arguements
 my $server = "irc.mindfang.org"; #This is the name of the Pesterchum server
@@ -39,7 +41,9 @@ my $bot = Bot::BasicBot->new(
         name      => $name,
         password  => $password,); #Create the bot object
 
-tie @Pester::Dave, 'Tie::File', 'redBubbleText' or die("Could not open DaveQuote file." . $!); #"Tie" The file to a perl array. (Nth line in file accessible as @Dave[N]
+tie @Pester::Dave, 'Tie::File', 'redBubbleText' or die("Could not open DaveQuote file: $!"); #"Tie" The file to a perl array. (Nth line in file accessible as @Dave[N])
+tie @Pester::Notes, 'Tie::File', '../Notes' or die("Error reading Notes file: $!");
+print "$#Pester::Dave\n";
 
 $bot->run(); #Run the bot!
 
@@ -50,13 +54,13 @@ sub Bot::BasicBot::tick{
     if($Pester::firstUpdate == 1){
         %Pester::rss = getMSPA();
         $Pester::firstUpdate = 0;
-#        $botob->say(who => "NickServ", channel => "msg", body => "id $password"); #Alternate password verification
+#       $botob->say(who => "NickServ", channel => "msg", body => "id $password"); #Alternate password verification
     }
 
     $Pester::lastUpdate = $Pester::rss{update};
     %Pester::rss = getMSPA(); 
     checkMSPA($botob, @channels); #This does the check and responds if there's an update
-    return 60;
+        return 60;
 }
 
 sub Bot::BasicBot::chanjoin{
@@ -64,9 +68,9 @@ sub Bot::BasicBot::chanjoin{
 
     $botob->say((channel => $$args{channel}, body => "PESTERCHUM:TIME>$Pester::currenttime")); #Displays the bot's current time for the other clients to use
 
-    if($$args{who} ne $nick){ #So that the bot doesn't say hi to himself when he joins. But for some reason, it makes him say "pesterBot:" :shrug:
-        Psay($botob, (channel => $$args{channel}, body => "Hello, $$args{who}."));
-    }
+        if($$args{who} ne $nick){ #So that the bot doesn't say hi to himself when he joins. But for some reason, it makes him say "pesterBot:" :shrug:
+            Psay($botob, (channel => $$args{channel}, body => "Hello, $$args{who}."));
+        }
 }
 
 #This is called any time anybody says something on a channel we are in
@@ -76,21 +80,26 @@ sub Bot::BasicBot::said{
     $$args{body} =~ s/<c=\d+,\d+,\d+>//ig; #remove colour tags
     $$args{body} =~ s/<\/c>//ig; #And their end tags
 
-    if($$args{body} =~ /\w{2,5}: change colou?r (\d+,\d+,\d+)/i){ #these check what people say for commands then runs the appropriate function
+    if($$args{body} =~ /$nick: change colou?r (\d+,\d+,\d+)/i){ #these check what people say for commands then runs the appropriate function
         Pcolor($botob, $args, $1);
     }
-    if($$args{body} =~ /\w{2,5}: say (.*)/i){
+    if($$args{body} =~ /$nick: say (.*)/i){
         Psay($botob, (channel => $$args{channel}, body => "$1"));
     }
-    if($$args{body} =~ /\w{2,5}: change time ([PFi](?:\d+:\d{2})?)/i){
+    if($$args{body} =~ /$nick: change time ([PFi](?:\d+:\d{2})?)/i){
         Ptime($botob, $args, $1);
     }
-   if($$args{body} =~ /\w{2}: random homestuck page/i){
+    if($$args{body} =~ /\w+: random homestuck page/i){
         randomPage($botob, $args);
     }
     if($$args{body} =~ /DAVE_EBUBBLES/i){
         daveEbubbles($botob, $args);
     }
+    if($$args{who} eq 'oneiricVariable' && $$args{body} =~ /Note: (.*)/i){ #Only I can do notes.
+        @Pester::Notes[$#Pester::Notes + 1] = "$1" or print STDERR "Note print failed: $!"; #For some reason Printing to a file discriptor doesn't work here.
+        Psay($botob, (channel => $$args{channel}, body => "Ok, $$args{who}, Noting '$1'."));
+    } 
+
     if($$args{body} =~ s/p[ea]e?r/<c=0,255,0>pear<\/c>/i){ #Automatic pear puns! (In honour of P_equals_NP)
         if( rand() < .3){
             Psay($botob, (channel => $$args{channel}, body => "$$args{body}"));
@@ -146,8 +155,8 @@ sub randomPage{
 sub daveEbubbles{
     my ($botob, $args) = @_;
 
-    my $numLines = 1514; #Number of lines in the redBubbleText file.
+    my $numLines = $#Pester::Dave; #Number of lines in the redBubbleText file.
 
-    my $line = int(rand($numLines));
+        my $line = int(rand($numLines));
     Psay( $botob, (channel => $$args{channel}, body => "<c=240,7,7>$Pester::Dave[$line]</c>"));
 }
